@@ -1,6 +1,5 @@
 let map, directionsService, directionsRenderer, currentMarker;
 
-
 async function initMap() {
     const { AdvancedMarkerElement } = await google.maps.importLibrary("marker");
     directionsService = new google.maps.DirectionsService();
@@ -23,7 +22,7 @@ async function initMap() {
                     lat: position.coords.latitude,
                     lng: position.coords.longitude,
                 };
-                map.setCenter(pos);
+                updateMapCenter(pos);
                 currentMarker = new google.maps.Marker({
                     position: pos,
                     map: map,
@@ -40,8 +39,16 @@ async function initMap() {
     }
 }
 
+function updateMapCenter(pos) {
+    if (map && pos) {
+        map.setCenter(pos);
+    } else {
+        console.error("Map is not initialized or position is undefined.");
+    }
+}
+
 function handleLocationError(browserHasGeolocation, pos) {
-    map.setCenter(pos);
+    updateMapCenter(pos);
 }
 
 function calculateRoute() {
@@ -67,16 +74,13 @@ function calculateRoute() {
                         end: endLocation
                     }
                 };
-                socket.send(JSON.stringify(routeData));
+                sendLocationData(routeData);
             }
         });
     } else {
         alert("Please provide a destination.");
     }
 }
-
-
-
 
 // Ensure that these functions are available globally
 window.initMap = initMap;
@@ -85,6 +89,17 @@ window.calculateRoute = calculateRoute;
 // WebSocket connection setup
 const socket = new WebSocket('wss://ambulancesystem.onrender.com/location-updates');
 
+socket.onopen = () => {
+    console.log('WebSocket connection opened');
+};
+
+function sendLocationData(data) {
+    if (socket.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify(data));
+    } else {
+        console.error('WebSocket is not open yet.');
+    }
+}
 
 setInterval(() => {
     if (navigator.geolocation) {
@@ -97,17 +112,18 @@ setInterval(() => {
 
                 if (currentMarker) {
                     currentMarker.setPosition(pos);
-                    map.setCenter(pos);
+                    updateMapCenter(pos);
                 } else {
                     currentMarker = new google.maps.Marker({
                         position: pos,
                         map: map,
                         title: "Your Location",
                     });
+                    updateMapCenter(pos);
                 }
 
                 // Send location data to the server
-                socket.send(JSON.stringify(pos));
+                sendLocationData(pos);
             }
         );
     }
