@@ -83,7 +83,8 @@ window.initMap = initMap;
 window.calculateRoute = calculateRoute;
 
 // WebSocket connection setup
-const socket = new WebSocket('wss://https://ambulancesystem.onrender.com/location-updates');
+const socket = new WebSocket('wss://ambulancesystem.onrender.com/location-updates');
+
 
 setInterval(() => {
     if (navigator.geolocation) {
