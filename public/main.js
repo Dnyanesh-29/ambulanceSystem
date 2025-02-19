@@ -23,7 +23,7 @@ async function initMap() {
                     lng: position.coords.longitude,
                 };
                 updateMapCenter(pos);
-                currentMarker = new google.maps.Marker({
+                currentMarker = new AdvancedMarkerElement({
                     position: pos,
                     map: map,
                     title: "Your Location",
@@ -114,7 +114,7 @@ setInterval(() => {
                     currentMarker.setPosition(pos);
                     updateMapCenter(pos);
                 } else {
-                    currentMarker = new google.maps.Marker({
+                    currentMarker = new AdvancedMarkerElement({
                         position: pos,
                         map: map,
                         title: "Your Location",
