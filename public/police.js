@@ -13,7 +13,7 @@ function initMap() {
     directionsRenderer.setMap(map);
 
     setTimeout(() => {
-        const socket = new WebSocket('wss://https://ambulancesystem.onrender.com/location-updates');
+        const socket = new WebSocket('wss://ambulancesystem.onrender.com/location-updates');
         
         socket.onmessage = function(event) {
             const data = event.data;
