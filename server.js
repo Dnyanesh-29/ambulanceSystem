@@ -7,7 +7,7 @@ const app = express();
 const PORT = 8080;
 
 app.use(cors({
-    origin: 'http://localhost:8080',
+    origin: 'https://ambulancesystem.onrender.com',
 }));
 
 app.use(express.static(path.join(__dirname, 'public')));
