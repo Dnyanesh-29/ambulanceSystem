@@ -1,7 +1,6 @@
 let map, directionsService, directionsRenderer, currentMarker;
 
 async function initMap() {
-    const { AdvancedMarkerElement } = await google.maps.importLibrary("marker");
     directionsService = new google.maps.DirectionsService();
     directionsRenderer = new google.maps.DirectionsRenderer();
 
@@ -23,7 +22,7 @@ async function initMap() {
                     lng: position.coords.longitude,
                 };
                 updateMapCenter(pos);
-                currentMarker = new AdvancedMarkerElement({
+                currentMarker = new google.maps.Marker({
                     position: pos,
                     map: map,
                     title: "Your Location",
@@ -114,7 +113,7 @@ setInterval(() => {
                     currentMarker.setPosition(pos);
                     updateMapCenter(pos);
                 } else {
-                    currentMarker = new AdvancedMarkerElement({
+                    currentMarker = new google.maps.Marker({
                         position: pos,
                         map: map,
                         title: "Your Location",
