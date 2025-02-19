@@ -1,7 +1,13 @@
 let map, directionsService, directionsRenderer, currentMarker;
-let socket;
+const socket = new WebSocket('wss://ambulancesystem.onrender.com/location-updates');
 
-async function initMap() {
+// Ensure WebSocket connection is established
+socket.onopen = () => {
+    console.log('WebSocket connection opened');
+};
+
+// Initialize Google Maps
+window.initMap = function () {
     directionsService = new google.maps.DirectionsService();
     directionsRenderer = new google.maps.DirectionsRenderer();
 
@@ -9,57 +15,33 @@ async function initMap() {
         center: { lat: -34.397, lng: 150.644 },
         zoom: 14,
         disableDefaultUI: true,
-        mapId: "AIzaSyCWMuj3kbeCY9t3n0szATJW92asgh8j21c", // Replace with your actual map ID
+        mapId: "YOUR_MAP_ID", // Replace with your actual map ID
     });
 
     directionsRenderer.setMap(map);
+    startLocationUpdates(); // Start tracking user location
+};
 
-    // Use HTML5 Geolocation API to get the current position
-    if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-            (position) => {
-                const pos = {
-                    lat: position.coords.latitude,
-                    lng: position.coords.longitude,
-                };
-                updateMapCenter(pos);
-                currentMarker = new google.maps.marker.AdvancedMarkerElement({
-                    position: pos,
-                    map: map,
-                    title: "Your Location",
-                });
-            },
-            (error) => {
-                console.error("Geolocation error:", error);
-                handleLocationError(true, map.getCenter());
-            }
-        );
-    } else {
-        // Browser doesn't support Geolocation
-        console.error("Geolocation is not supported by this browser.");
-        handleLocationError(false, map.getCenter());
-    }
-}
-
+// Function to update the map center
 function updateMapCenter(pos) {
-    if (map && pos && pos.lat !== undefined && pos.lng !== undefined) {
+    if (map && pos && typeof pos.lat === "number" && typeof pos.lng === "number") {
         map.setCenter(pos);
     } else {
-        console.error("Map is not initialized or position is undefined.");
+        console.warn("Skipping update: Map is not initialized or position is invalid.");
     }
 }
 
+// Function to handle location errors
 function handleLocationError(browserHasGeolocation, pos) {
     updateMapCenter(pos);
-    alert(browserHasGeolocation
-        ? "Error: The Geolocation service failed."
-        : "Error: Your browser doesn't support geolocation.");
 }
 
+// Function to calculate and display route
 function calculateRoute() {
     const endLocation = document.getElementById("end-location").value;
+
     if (endLocation && currentMarker) {
-        const start = currentMarker.position;
+        const start = currentMarker.getPosition();
         const request = {
             origin: start,
             destination: endLocation,
@@ -67,21 +49,21 @@ function calculateRoute() {
         };
 
         directionsService.route(request, function (result, status) {
-            if (status == 'OK') {
+            if (status === 'OK') {
                 directionsRenderer.setDirections(result);
 
                 // Send route data to the server
                 const routeData = {
-                    latitude: start.lat,
-                    longitude: start.lng,
+                    latitude: start.lat(),
+                    longitude: start.lng(),
                     route: {
-                        start: { lat: start.lat, lng: start.lng },
+                        start: start.toJSON(),
                         end: endLocation
                     }
                 };
                 sendLocationData(routeData);
             } else {
-                console.error("Error calculating route:", status);
+                console.error("Route calculation failed:", status);
             }
         });
     } else {
@@ -89,35 +71,28 @@ function calculateRoute() {
     }
 }
 
-// Ensure that these functions are available globally
-window.initMap = initMap;
-window.calculateRoute = calculateRoute;
-
-// WebSocket connection setup with auto-reconnect
-function setupWebSocket() {
-    socket = new WebSocket('wss://ambulancesystem.onrender.com/location-updates');
-
-    socket.onopen = () => console.log('WebSocket connection opened');
-    socket.onerror = (error) => console.error('WebSocket error:', error);
-    socket.onclose = () => {
-        console.log('WebSocket closed. Reconnecting in 3 seconds...');
-        setTimeout(setupWebSocket, 3000); // Attempt to reconnect
-    };
-}
-
-setupWebSocket();
-
+// Function to send location data via WebSocket
 function sendLocationData(data) {
     if (socket.readyState === WebSocket.OPEN) {
         socket.send(JSON.stringify(data));
     } else {
-        console.error('WebSocket is not open yet.');
+        console.error("WebSocket is not open yet.");
     }
 }
 
-// Update location every 2 seconds
-setInterval(() => {
-    if (navigator.geolocation) {
+// Function to start tracking location updates
+function startLocationUpdates() {
+    if (!navigator.geolocation) {
+        console.error("Geolocation is not supported.");
+        return;
+    }
+
+    setInterval(() => {
+        if (!map) {
+            console.warn("Skipping location update: Map not initialized.");
+            return;
+        }
+
         navigator.geolocation.getCurrentPosition(
             (position) => {
                 const pos = {
@@ -126,10 +101,10 @@ setInterval(() => {
                 };
 
                 if (currentMarker) {
-                    currentMarker.position = pos;
+                    currentMarker.setPosition(pos);
                     updateMapCenter(pos);
                 } else {
-                    currentMarker = new google.maps.marker.AdvancedMarkerElement({
+                    currentMarker = new google.maps.Marker({
                         position: pos,
                         map: map,
                         title: "Your Location",
@@ -144,5 +119,9 @@ setInterval(() => {
                 console.error("Geolocation update error:", error);
             }
         );
-    }
-}, 2000); // Update every 2 seconds
+    }, 2000);
+}
+
+// Ensure global function access
+window.calculateRoute = calculateRoute;
+
