@@ -1,4 +1,5 @@
 let map, directionsService, directionsRenderer, currentMarker;
+let socket;
 
 async function initMap() {
     directionsService = new google.maps.DirectionsService();
@@ -22,24 +23,26 @@ async function initMap() {
                     lng: position.coords.longitude,
                 };
                 updateMapCenter(pos);
-                currentMarker = new google.maps.Marker({
+                currentMarker = new google.maps.marker.AdvancedMarkerElement({
                     position: pos,
                     map: map,
                     title: "Your Location",
                 });
             },
-            () => {
+            (error) => {
+                console.error("Geolocation error:", error);
                 handleLocationError(true, map.getCenter());
             }
         );
     } else {
         // Browser doesn't support Geolocation
+        console.error("Geolocation is not supported by this browser.");
         handleLocationError(false, map.getCenter());
     }
 }
 
 function updateMapCenter(pos) {
-    if (map && pos) {
+    if (map && pos && pos.lat !== undefined && pos.lng !== undefined) {
         map.setCenter(pos);
     } else {
         console.error("Map is not initialized or position is undefined.");
@@ -48,32 +51,37 @@ function updateMapCenter(pos) {
 
 function handleLocationError(browserHasGeolocation, pos) {
     updateMapCenter(pos);
+    alert(browserHasGeolocation
+        ? "Error: The Geolocation service failed."
+        : "Error: Your browser doesn't support geolocation.");
 }
 
 function calculateRoute() {
     const endLocation = document.getElementById("end-location").value;
     if (endLocation && currentMarker) {
-        const start = currentMarker.getPosition();
+        const start = currentMarker.position;
         const request = {
             origin: start,
             destination: endLocation,
             travelMode: 'DRIVING'
         };
 
-        directionsService.route(request, function(result, status) {
+        directionsService.route(request, function (result, status) {
             if (status == 'OK') {
                 directionsRenderer.setDirections(result);
 
                 // Send route data to the server
                 const routeData = {
-                    latitude: start.lat(),
-                    longitude: start.lng(),
+                    latitude: start.lat,
+                    longitude: start.lng,
                     route: {
-                        start: start.toJSON(),
+                        start: { lat: start.lat, lng: start.lng },
                         end: endLocation
                     }
                 };
                 sendLocationData(routeData);
+            } else {
+                console.error("Error calculating route:", status);
             }
         });
     } else {
@@ -85,12 +93,19 @@ function calculateRoute() {
 window.initMap = initMap;
 window.calculateRoute = calculateRoute;
 
-// WebSocket connection setup
-const socket = new WebSocket('wss://ambulancesystem.onrender.com/location-updates');
+// WebSocket connection setup with auto-reconnect
+function setupWebSocket() {
+    socket = new WebSocket('wss://ambulancesystem.onrender.com/location-updates');
 
-socket.onopen = () => {
-    console.log('WebSocket connection opened');
-};
+    socket.onopen = () => console.log('WebSocket connection opened');
+    socket.onerror = (error) => console.error('WebSocket error:', error);
+    socket.onclose = () => {
+        console.log('WebSocket closed. Reconnecting in 3 seconds...');
+        setTimeout(setupWebSocket, 3000); // Attempt to reconnect
+    };
+}
+
+setupWebSocket();
 
 function sendLocationData(data) {
     if (socket.readyState === WebSocket.OPEN) {
@@ -100,6 +115,7 @@ function sendLocationData(data) {
     }
 }
 
+// Update location every 2 seconds
 setInterval(() => {
     if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
@@ -110,10 +126,10 @@ setInterval(() => {
                 };
 
                 if (currentMarker) {
-                    currentMarker.setPosition(pos);
+                    currentMarker.position = pos;
                     updateMapCenter(pos);
                 } else {
-                    currentMarker = new google.maps.Marker({
+                    currentMarker = new google.maps.marker.AdvancedMarkerElement({
                         position: pos,
                         map: map,
                         title: "Your Location",
@@ -123,6 +139,9 @@ setInterval(() => {
 
                 // Send location data to the server
                 sendLocationData(pos);
+            },
+            (error) => {
+                console.error("Geolocation update error:", error);
             }
         );
     }
